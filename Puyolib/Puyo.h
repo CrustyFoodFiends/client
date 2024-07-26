@@ -24,7 +24,6 @@ public:
 	Puyo(const Puyo& self); // Copy constructor
 	virtual ~Puyo();
 	virtual Puyo* clone();
-	void reloadSprite();
 
 	// Get and set
 	[[nodiscard]] int posX() const { return m_posX; } // Returns indexed position

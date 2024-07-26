@@ -29,7 +29,6 @@ public:
 		setSprite();
 	}
 	void setVisible(const bool b) { m_sprite.setVisible(b); }
-	void hotReload();
 
 private:
 	void setSprite();
@@ -136,7 +135,6 @@ public:
 	// Draw
 	void draw();
 	void drawQuick();
-	void hotReload();
 };
 
 }

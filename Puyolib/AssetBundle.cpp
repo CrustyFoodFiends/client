@@ -29,6 +29,7 @@ TokenFnTranslator::TokenFnTranslator(ppvs::GameAssetSettings* aS)
 
 TokenFnTranslator::~TokenFnTranslator() = default;
 
+
 void TokenFnTranslator::reload()
 {
 	specialTokens = {
@@ -37,30 +38,19 @@ void TokenFnTranslator::reload()
 		{ "%background%", kFolderUserBackgrounds + "/" + gameSettings->background },
 		{ "%puyo%", kFolderUserPuyo + "/" + gameSettings->puyo },
 		{ "%sfx%", gameSettings->sfx },
-		{ "%usersounds%", kFolderUserSounds },
-		{ "%charsetup%", kFolderUserCharacter }
+		{ "%usersounds%", kFolderUserSounds},
+		{ "%charsetup%", kFolderUserCharacter  }
 		// { "%custom%", custom_value } // Specifier for menus, animations
 	};
 }
-
-void TokenFnTranslator::reload(GameAssetSettings* settings)
-{
-	settings->baseAssetDir = gameSettings->baseAssetDir; // Keep current folder location
-	gameSettings = settings;
-	reload();
+std::string TokenFnTranslator::token2fn(const SoundEffectToken token, const std::string& custom) {
+	return token2fn(sndTokenToPseudoFn[token],custom);
 }
-
-std::string TokenFnTranslator::token2fn(const SoundEffectToken token, const std::string& custom)
-{
-	return token2fn(sndTokenToPseudoFn[token], custom);
+std::string TokenFnTranslator::token2fn(const ImageToken token, const std::string& custom) {
+	return token2fn(imgTokenToPseudoFn[token],custom);
 }
-std::string TokenFnTranslator::token2fn(const ImageToken token, const std::string& custom)
-{
-	return token2fn(imgTokenToPseudoFn[token], custom);
-}
-std::string TokenFnTranslator::token2fn(const AnimationToken token, const std::string& custom)
-{
-	return token2fn(animTokenToPseudoFn[token], custom);
+std::string TokenFnTranslator::token2fn(const AnimationToken token, const std::string& custom) {
+	return token2fn(animTokenToPseudoFn[token],custom);
 }
 
 std::string TokenFnTranslator::token2fn(const std::string& token, const std::string& custom)
@@ -84,17 +74,14 @@ std::string TokenFnTranslator::token2fn(const std::string& token, const std::str
 	return result;
 }
 // FIXME: duplicated code
-std::string TokenFnTranslator::token2fn(const SoundEffectToken token, const PuyoCharacter character)
-{
-	return token2fn(sndTokenToPseudoFn[token], character);
+std::string TokenFnTranslator::token2fn(const SoundEffectToken token, const  PuyoCharacter character) {
+	return token2fn(sndTokenToPseudoFn[token],character);
 }
-std::string TokenFnTranslator::token2fn(const ImageToken token, const PuyoCharacter character)
-{
-	return token2fn(imgTokenToPseudoFn[token], character);
+std::string TokenFnTranslator::token2fn(const ImageToken token, const  PuyoCharacter character) {
+	return token2fn(imgTokenToPseudoFn[token],character);
 }
-std::string TokenFnTranslator::token2fn(const AnimationToken token, const PuyoCharacter character)
-{
-	return token2fn(animTokenToPseudoFn[token], character);
+std::string TokenFnTranslator::token2fn(const AnimationToken token, const  PuyoCharacter character) {
+	return token2fn(animTokenToPseudoFn[token],character);
 }
 
 std::string TokenFnTranslator::token2fn(const std::string& token, PuyoCharacter character)
@@ -111,45 +98,49 @@ std::string TokenFnTranslator::token2fn(const std::string& token, PuyoCharacter 
 	return result;
 }
 
-FolderAssetBundle::FolderAssetBundle(ppvs::GameAssetSettings* folderLocations, bool is_user_defined)
-	: AssetBundle()
+FolderAssetBundle::FolderAssetBundle(Frontend* fe, ppvs::GameAssetSettings* folderLocations)
+	: AssetBundle(fe)
 	, m_settings(folderLocations)
 {
 	m_translator = new TokenFnTranslator(folderLocations);
-	user_defined = is_user_defined;
 }
 
 AssetBundle* FolderAssetBundle::clone()
 {
-	AssetBundle* new_bundle = new FolderAssetBundle(m_settings);
+	AssetBundle* new_bundle = new FolderAssetBundle(m_frontend, m_settings);
 	return new_bundle;
 }
 
-bool FolderAssetBundle::affectedByUser()
+bool FolderAssetBundle::init(ppvs::Frontend* fe)
 {
-	return user_defined;
+
+	if (!m_frontend) {
+		m_frontend = fe;
+		return false;
+	}
+	return true; // invalid call
 }
 
 // Loads the texture, returns whether the load was successful (for files, whether the file exists and loads)
-FeImage* FolderAssetBundle::loadImage(ImageToken token, std::string custom, Frontend* frontend)
+FeImage* FolderAssetBundle::loadImage(ImageToken token, std::string custom = "")
 {
-	return frontend->loadImage(m_translator->token2fn(token, custom));
+	return m_frontend->loadImage(m_translator->token2fn(token, custom));
 }
 
 // Loads the sound, returns whether the load was successful (for files, whether the file exists and loads)
-FeSound* FolderAssetBundle::loadSound(SoundEffectToken token, std::string custom, Frontend* frontend)
+FeSound* FolderAssetBundle::loadSound(SoundEffectToken token, std::string custom)
 {
-	return frontend->loadSound(m_translator->token2fn(token, custom));
+	return m_frontend->loadSound(m_translator->token2fn(token, custom));
 }
 
-FeImage* FolderAssetBundle::loadCharImage(ImageToken token, PuyoCharacter character, Frontend* frontend)
+FeImage* FolderAssetBundle::loadCharImage(ImageToken token, PuyoCharacter character)
 {
-	return frontend->loadImage(m_translator->token2fn(token, character));
+	return m_frontend->loadImage(m_translator->token2fn(token, character));
 }
 
-FeSound* FolderAssetBundle::loadCharSound(SoundEffectToken token, PuyoCharacter character, Frontend* frontend)
+FeSound* FolderAssetBundle::loadCharSound(SoundEffectToken token, PuyoCharacter character)
 {
-	return frontend->loadSound(m_translator->token2fn(token, character));
+	return m_frontend->loadSound(m_translator->token2fn(token, character));
 }
 
 bool isPossiblyAnimation(std::string fname, std::string script_name)
@@ -171,10 +162,12 @@ std::string FolderAssetBundle::getAnimationFolder(AnimationToken token, std::str
 	return isPossiblyAnimation(dir, script_name) ? dir : "";
 }
 
-void FolderAssetBundle::reload(GameAssetSettings* settings)
+void FolderAssetBundle::reload(Frontend* fe)
 {
-	assert(user_defined);
-	m_translator->reload(settings);
+	if (fe) {
+		m_frontend = fe;
+	}
+	m_translator->reload();
 }
 
 void FolderAssetBundle::reload()

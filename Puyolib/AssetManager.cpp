@@ -5,13 +5,19 @@
 
 namespace ppvs {
 
-AssetManagerPriv* AssetManager::generateGamePriv(Frontend* frontend, DebugLog* m_dbg)
+AssetManager* AssetManager::clone()
 {
-	return new AssetManagerPriv(this, frontend, m_dbg ? m_dbg : m_debug);
+	auto* current = new AssetManager;
+	for (auto bundle : m_bundleList) {
+		current->loadBundle(bundle->clone());
+	}
+	current->activate(m_front, m_debug);
+	return current;
 }
 
-AssetManager::AssetManager(DebugLog* dbg)
-	: m_debug(dbg)
+AssetManager::AssetManager(ppvs::Frontend* fe, DebugLog* dbg)
+	: m_front(fe)
+	, m_debug(dbg)
 {
 	if (m_debug != nullptr) {
 		m_debug->log("Asset manager loaded", DebugMessageType::Debug);
@@ -28,8 +34,22 @@ AssetManager::~AssetManager()
 	}
 }
 
+void AssetManager::activate(ppvs::Frontend* fe, ppvs::DebugLog* debug)
+{
+	m_front = fe;
+	m_debug = debug;
+	reloadBundles();
+	// Do not activate unless we know we won't call nullptr
+	if (m_front != nullptr && m_debug != nullptr) {
+		activated = true;
+	} else {
+		activated = false;
+	}
+}
+
 bool AssetManager::loadBundle(AssetBundle* bundle, int priority)
 {
+	bundle->init(m_front);
 	bundle->reload();
 	bundle->m_debug = m_debug;
 	// TODO: implement priority
@@ -61,35 +81,41 @@ bool AssetManager::unloadAll()
 	return false;
 }
 
-FeImage* AssetManager::loadImage(ImageToken token, const std::string& custom, Frontend* frontend)
+FeImage* AssetManager::loadImage(const ImageToken token, const std::string& custom)
 {
 	FeImage* target {};
 	for (auto* bundle : m_bundleList) {
-		target = bundle->loadImage(token, custom, frontend);
+		target = bundle->loadImage(token, custom);
 		if (target != nullptr && !target->error()) {
 			break;
 		}
 	}
-	return target;
-}
-
-FeImage* AssetManager::loadImage(const ImageToken token, PuyoCharacter character, Frontend* frontend)
-{
-	FeImage* target {};
-	for (auto* bundle : m_bundleList) {
-		target = bundle->loadCharImage(token, character, frontend);
-		if (target != nullptr && !target->error()) {
-			break;
-		}
+	if (target == nullptr || target->error()) {
+		m_debug->log("Error loading image token " + toString(static_cast<int>(token)) + " custom " + custom, DebugMessageType::Error);
 	}
 	return target;
 }
 
-FeSound* AssetManager::loadSound(const SoundEffectToken token, const std::string& custom, Frontend* frontend)
+FeImage* AssetManager::loadImage(const ImageToken token, PuyoCharacter character)
+{
+	FeImage* target {};
+	for (auto* bundle : m_bundleList) {
+		target = bundle->loadCharImage(token, character);
+		if (target != nullptr && !target->error()) {
+			break;
+		}
+	}
+	if (target == nullptr || target->error()) {
+		m_debug->log("Error loading image token " + toString(static_cast<int>(token)) + " character " + std::to_string(static_cast<int>(character)), DebugMessageType::Error);
+	}
+	return target;
+}
+
+FeSound* AssetManager::loadSound(const SoundEffectToken token, const std::string& custom)
 {
 	FeSound* target = {};
 	for (auto* bundle : m_bundleList) {
-		target = bundle->loadSound(token, custom, frontend);
+		target = bundle->loadSound(token, custom);
 		if (!target->error()) {
 			// target->play();
 			break;
@@ -97,19 +123,25 @@ FeSound* AssetManager::loadSound(const SoundEffectToken token, const std::string
 			target = nullptr;
 		}
 	}
+	if (target == nullptr || target->error()) {
+		m_debug->log("Error loading sound token " + toString(static_cast<int>(token)) + " custom " + custom, DebugMessageType::Error);
+	}
 	return target;
 }
 
-FeSound* AssetManager::loadSound(const SoundEffectToken token, PuyoCharacter character, Frontend* frontend)
+FeSound* AssetManager::loadSound(const SoundEffectToken token, PuyoCharacter character)
 {
 	FeSound* target = {};
 	for (auto* bundle : m_bundleList) {
-		target = bundle->loadCharSound(token, character, frontend);
+		target = bundle->loadCharSound(token, character);
 		if (!target->error()) {
 			break;
 		} else {
 			target = nullptr;
 		}
+	}
+	if (target == nullptr || target->error()) {
+		m_debug->log("Error loading sound token " + toString(static_cast<int>(token)) + " character " + std::to_string(static_cast<int>(character)), DebugMessageType::Error);
 	}
 	return target;
 }
@@ -123,6 +155,9 @@ std::string AssetManager::getAnimationFolder(ppvs::PuyoCharacter character)
 			break;
 		}
 	}
+	if (target.empty()) {
+		m_debug->log("Error loading animation script character " + std::to_string(static_cast<int>(character)), DebugMessageType::Error);
+	}
 	return target;
 }
 
@@ -134,6 +169,9 @@ std::string AssetManager::getAnimationFolder(AnimationToken token, const std::st
 		if (!target.empty()) {
 			break;
 		}
+	}
+	if (target.empty()) {
+		m_debug->log("Error loading animation script token " + toString(static_cast<int>(token)), DebugMessageType::Error);
 	}
 	return target;
 }
@@ -186,109 +224,10 @@ bool AssetManager::reloadBundles()
 {
 	int number_of_loaded = 0;
 	for (auto bundle : m_bundleList) {
-		assert(bundle!= nullptr);
-		bundle->reload();
+		bundle->reload(m_front);
 		number_of_loaded++;
 	}
 	return number_of_loaded;
-}
-bool AssetManager::reloadBundles(GameAssetSettings* settings) {
-	int number_of_loaded = 0;
-	for (auto bundle: m_bundleList) {
-		assert(bundle!= nullptr);
-		if (bundle->affectedByUser()) {
-			bundle->reload(settings);
-			number_of_loaded++;
-		}
-	}
-	assert(number_of_loaded);
-	return number_of_loaded;
-}
-
-AssetManagerPriv::AssetManagerPriv(AssetManager* parent, Frontend* frontend, DebugLog* dbg)
-	: own_parent(parent)
-	, m_frontend(frontend)
-	, m_debug(dbg)
-{
-	allow_loading();
-};
-
-void AssetManagerPriv::activate(ppvs::Frontend* fe, ppvs::DebugLog* debug)
-{
-	m_frontend = fe;
-	m_debug = debug;
-	// Do not activate unless we know we won't call nullptr
-	if (m_frontend != nullptr && m_debug != nullptr) {
-		activated = true;
-	} else {
-		activated = false;
-	}
-}
-
-// Attempts to load the image with the token (see FolderAssetBundle in AssetBundle.h)
-// parameter `custom` will replace %custom% tag in pseudo-filename
-FeImage* AssetManagerPriv::loadImage(ImageToken token, const std::string& custom)
-{
-	while (load_lock) { };
-	auto* target = own_parent->loadImage(token, custom, m_frontend);
-	if (target == nullptr || target->error()) {
-		m_debug->log("Error loading image token " + toString(static_cast<int>(token)) + " custom " + custom, DebugMessageType::Error);
-	}
-	return target;
-}
-
-// Attempts to load the sound with the token (see FolderAssetBundle in AssetBundle.h)
-// parameter `custom` will replace %custom% tag in pseudo-filename
-FeSound* AssetManagerPriv::loadSound(SoundEffectToken token, const std::string& custom)
-{
-	while (load_lock) { };
-	auto* target = own_parent->loadSound(token, custom, m_frontend);
-	if (target == nullptr || target->error()) {
-		m_debug->log("Error loading sound token " + toString(static_cast<int>(token)) + " custom " + custom, DebugMessageType::Error);
-	}
-	return target;
-}
-
-// Attempts to load the character-based image with the token (see FolderAssetBundle in AssetBundle.h)
-FeImage* AssetManagerPriv::loadImage(ImageToken token, PuyoCharacter character)
-{
-	while (load_lock) { };
-	auto* target = own_parent->loadImage(token, character, m_frontend);
-	if (target == nullptr || target->error()) {
-		m_debug->log("Error loading image token " + toString(static_cast<int>(token)) + " character " + std::to_string(static_cast<int>(character)), DebugMessageType::Error);
-	}
-	return target;
-};
-// Attempts to load the character-based sound with the token (see FolderAssetBundle in AssetBundle.h)
-FeSound* AssetManagerPriv::loadSound(SoundEffectToken token, PuyoCharacter character)
-{
-	while (load_lock) { };
-	auto* target = own_parent->loadSound(token, character, m_frontend);
-	if (target == nullptr || target->error()) {
-		m_debug->log("Error loading sound token " + toString(static_cast<int>(token)) + " character " + std::to_string(static_cast<int>(character)), DebugMessageType::Error);
-	}
-	return target;
-};
-
-// Attempts to locate a viable folder for animation files
-// Takes a token and filename of script
-std::string AssetManagerPriv::getAnimationFolder(AnimationToken token, const std::string& script_name)
-{
-	auto target = own_parent->getAnimationFolder(token, script_name);
-	if (target.empty()) {
-		m_debug->log("Error loading animation script token " + toString(static_cast<int>(token)), DebugMessageType::Error);
-	}
-	return target;
-}
-// Attempts to locate a viable folder for animation files
-// Takes a character, setup is assumed
-std::string AssetManagerPriv::getAnimationFolder(ppvs::PuyoCharacter character)
-{
-	auto target = own_parent->getAnimationFolder(character);
-	if (target.empty()) {
-		m_debug->log("Error loading animation script character " + toString(static_cast<int>(character)), DebugMessageType::Error);
-	}
-	return target;
 }
 
 } // ppvs

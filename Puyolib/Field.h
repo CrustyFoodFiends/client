@@ -62,7 +62,6 @@ public:
 	void setVisible(bool);
 	void drawField() const;
 	void draw() const;
-	void hotReload();
 
 	// Game-play related functions
 	void createPuyo(); // Phase 20
