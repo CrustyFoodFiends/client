@@ -6,6 +6,7 @@
 #include "DebugLog.h"
 #include "GameSettings.h"
 #include "RuleSet/RuleSet.h"
+#include <filesystem>
 #include <iostream>
 #include <map>
 #include <string>
@@ -140,11 +141,12 @@ public:
 	std::string token2fn(ImageToken token, const std::string& custom = "");
 	std::string token2fn(AnimationToken token, const std::string& custom = "");
 	// For character-specific tokens
-	std::string token2fn(const std::string& token,  PuyoCharacter character);
+	std::string token2fn(const std::string& token, PuyoCharacter character);
 	std::string token2fn(SoundEffectToken token, PuyoCharacter character);
 	std::string token2fn(ImageToken token, PuyoCharacter character);
 	std::string token2fn(AnimationToken token, PuyoCharacter character);
 
+	std::filesystem::path getBaseFolder();
 
 	DebugLog* m_debug {};
 
@@ -311,6 +313,7 @@ public:
 	virtual void reload(Frontend* fe) = 0;
 
 	bool active = false;
+	bool valid = false;
 	DebugLog* m_debug {};
 
 protected:
