@@ -1463,7 +1463,10 @@ void Field::dropGarbage(const bool automatic, const int dropAmount)
 			m_player->m_characterAnimation.prepareAnimation("damage2");
 		}
 
-		m_player->m_garbageDropped = min(dropN, 30);
+
+		int maxDropped = 30;
+
+		m_player->m_garbageDropped = min(dropN, maxDropped);
 
 		// Reset nuisance drop pattern (doesn't affect legacy)
 		m_player->resetNuisanceDropPattern();

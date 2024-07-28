@@ -467,9 +467,15 @@ void MovePuyo::setSpriteY()
 			}
 		}
 
+
+		float dropSpeed = m_player->m_dropSpeed;
+		if (m_player->m_normalGarbage.cq + m_player->m_feverGarbage.cq > 30) {
+			dropSpeed *= 4;
+		}
+
 		// Add to fallcounter
 		if (m_fallCounter < 100)
-			m_fallCounter += static_cast<int>(m_player->m_dropSpeed);
+			m_fallCounter += static_cast<int>(dropSpeed);
 
 		// Add score here
 		if (m_player->m_controls.m_down > 0 && m_fallCounter >= 100 && !isAnyTouching(BELOW)) {
@@ -1194,6 +1200,10 @@ bool MovePuyo::isAnyTouching(const Direction dir) const
 void MovePuyo::placePuyos()
 {
 	if (m_fallCounter > 90 && isAnyTouching(BELOW)) {
+		// Check if awaiting damage this turn
+		if (m_player->m_normalGarbage.cq + m_player->m_feverGarbage.cq > 30) {
+			m_dropCounter += 10;
+		}
 		m_dropCounter += 1;
 	}
 	if (m_dropCounter > 90 && m_player->m_currentGame->m_settings->recording != RecordState::REPLAYING) {

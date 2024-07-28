@@ -587,10 +587,12 @@ void Player::play()
 		debugString = "";
 		debugString += toString(static_cast<int>(m_currentPhase)) + "\n";
 		debugString += "garbage: " + toString(m_forgiveGarbage) + "\n";
-		if (m_activeGarbage == &m_normalGarbage)
+		if (m_activeGarbage == &m_normalGarbage) {
 			debugString += "normal: " + toString(m_activeGarbage->gq) + "\n";
-		else
+			debugString += "normal c: " + toString(m_activeGarbage->cq) + "\n";
+		} else {
 			debugString += "fever: " + toString(m_activeGarbage->gq) + "\n";
+		}
 
 		if (!m_messages.empty())
 			debugString += std::string("mes: ") + m_messages.front()[0] + "\n";
